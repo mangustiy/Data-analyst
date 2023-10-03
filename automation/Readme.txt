@@ -1,0 +1,1 @@
+Ссылка на дашборд: https://public.tableau.com/app/profile/dan.gri5034/viz/Ya_pr_DanGri/Dashboard1?publish=yes 
