@@ -1,241 +1,196 @@
-SELECT COUNT(status)
-FROM company
-WHERE status='closed'
+SELECT COUNT(*)
+FROM stackoverflow.posts
+WHERE score >= 300 OR favorites_count >= 100
 ---
-  
-SELECT SUM(funding_total)
-FROM company
-WHERE country_code = 'USA'
-    AND category_code = 'news'
-GROUP BY name
-ORDER BY SUM(funding_total) DESC
+
+SELECT ROUND(AVG(days.COUNT), 0)
+FROM (
+    SELECT COUNT(*)
+    FROM stackoverflow.posts
+    WHERE post_type_id = 1
+    GROUP BY creation_date::date
+    HAVING creation_date::date BETWEEN '2008-11-01' AND '2008-11-18') AS days
 ---
-  
-SELECT SUM(price_amount)
-FROM acquisition
-WHERE term_code = 'cash'
-AND EXTRACT(YEAR FROM CAST(acquired_at AS date)) BETWEEN 2011 AND 2013
+
+SELECT COUNT (DISTINCT u.id)
+FROM stackoverflow.badges b
+JOIN stackoverflow.users u ON b.user_id = u.id
+WHERE b.creation_date::date = u.creation_date::date
 ---
-  
-SELECT first_name, last_name, twitter_username
-FROM people
-WHERE twitter_username LIKE 'Silver%'
+
+SELECT COUNT(h.id)
+FROM(
+    SELECT p.id
+    FROM stackoverflow.posts p
+    JOIN stackoverflow.votes v ON p.id = v.post_id
+    JOIN stackoverflow.users u ON p.user_id = u.id
+    WHERE u.display_name = 'Joel Coehoorn'
+    GROUP BY p.id
+    HAVING COUNT(v.id)>=1) AS h
 ---
-  
+
+SELECT *, ROW_NUMBER() OVER (ORDER BY id DESC) AS rank
+FROM stackoverflow.vote_types
+ORDER BY id
+---
+
 SELECT *
-FROM people
-WHERE twitter_username LIKE '%money%'
-AND last_name LIKE 'K%'
----
-  
-SELECT country_code, SUM(funding_total)
-FROM company
-GROUP BY country_code
-ORDER BY SUM(funding_total) DESC
----
-  
-SELECT funded_at, MIN(raised_amount), MAX(raised_amount)
-FROM funding_round
-GROUP BY funded_at
-HAVING MIN(raised_amount) != 0 AND MIN(raised_amount) != MAX(raised_amount)
----
-  
-SELECT *,
-         CASE 
-            WHEN invested_companies >= 100 THEN 'high_activity'
-            WHEN invested_companies < 20 THEN 'low_activity'
-            ELSE 'middle_activity'
-         END
-FROM fund
----
-  
-SELECT
-       CASE
-           WHEN invested_companies>=100 THEN 'high_activity'
-           WHEN invested_companies>=20 THEN 'middle_activity'
-           ELSE 'low_activity'
-       END AS activity,
-       ROUND(AVG(investment_rounds))
-FROM fund
-GROUP BY activity
-ORDER BY ROUND(AVG(investment_rounds))
----
-  
-SELECT country_code, MIN(invested_companies), MAX(invested_companies), AVG(invested_companies)
-FROM fund
-WHERE EXTRACT(YEAR FROM founded_at) IN (2010, 2011, 2012)
-GROUP BY country_code
-HAVING MIN(invested_companies) != 0
-ORDER BY AVG(invested_companies) DESC, country_code
-LIMIT 10
----
-  
-SELECT p.first_name, p.last_name, e.instituition
-FROM people AS p
-LEFT JOIN education AS e ON p.id = e.person_id
----
-  
-SELECT c.name, COUNT(DISTINCT e.instituition)
-FROM company AS c
-JOIN people AS p ON c.id = p.company_id
-JOIN education AS e ON p.id = e.person_id
-GROUP BY c.name
-ORDER BY COUNT(DISTINCT e.instituition) DESC
-LIMIT 5
----
-  
-SELECT name
-FROM company AS c
-LEFT JOIN funding_round AS fr ON c.id = fr.company_id
-WHERE status = 'closed'
-AND is_last_round = 1
-AND is_first_round = 1
-GROUP BY name
----
-  
-SELECT DISTINCT p.id
-FROM people AS p
-WHERE p.company_id IN (SELECT c.id
-                       FROM company AS c
-                       LEFT JOIN funding_round AS fr ON c.id = fr.company_id
-                       WHERE status = 'closed'
-                       AND is_last_round = 1
-                       AND is_first_round = 1
-                       GROUP BY c.id)
----
-  
-SELECT p.id, e.instituition
-FROM people AS p
-LEFT JOIN education AS e ON p.id = e.person_id
-WHERE e.person_id IN (SELECT p.id
-                      FROM people AS p
-                      WHERE p.company_id IN (SELECT c.id
-                      FROM company AS c
-                      LEFT JOIN funding_round AS fr ON c.id = fr.company_id
-                      WHERE status = 'closed'
-                      AND is_last_round = 1
-                      AND is_first_round = 1
-                      GROUP BY c.id))
-GROUP BY p.id, e.instituition
-HAVING instituition IS NOT NULL
----
-  
-SELECT p.id, COUNT(e.instituition)
-FROM people AS p
-LEFT JOIN education AS e ON p.id = e.person_id
-WHERE p.company_id IN (SELECT c.id
-                       FROM company AS c
-                       JOIN funding_round AS fr ON c.id = fr.company_id
-                       WHERE STATUS ='closed'
-                       AND is_first_round = 1
-                       AND is_last_round = 1
-                       GROUP BY c.id)
-GROUP BY p.id
-HAVING COUNT(DISTINCT e.instituition) > 0
----
-  
-SELECT AVG(count)
-FROM (SELECT p.id, COUNT(e.instituition)
-      FROM people AS p
-      LEFT JOIN education AS e ON p.id = e.person_id
-      WHERE p.company_id IN (SELECT c.id
-                             FROM company AS c
-                             JOIN funding_round AS fr ON c.id = fr.company_id
-                             WHERE STATUS ='closed'
-                             AND is_first_round = 1
-                             AND is_last_round = 1
-                             GROUP BY c.id)
-      GROUP BY p.id
-      HAVING COUNT(e.instituition) > 0) AS g
----
-  
-SELECT AVG(count)
-FROM (SELECT p.id, COUNT(e.instituition)
-      FROM people AS p
-      LEFT JOIN education AS e ON p.id = e.person_id
-      WHERE p.company_id IN (SELECT c.id
-                             FROM company AS c
-                             JOIN funding_round AS fr ON c.id = fr.company_id
-                             AND c.name = 'Facebook'
-                             GROUP BY c.id)
-      GROUP BY p.id
-      HAVING COUNT(e.instituition) >0) AS g
----
-  
-SELECT f.name AS name_of_fund, c.name AS name_of_company, fr.raised_amount AS amount
-FROM investment AS i
-LEFT JOIN company AS c ON c.id = i.company_id
-LEFT JOIN fund AS f ON i.fund_id = f.id
-INNER JOIN (SELECT *
-            FROM funding_round
-            WHERE funded_at BETWEEN '2012-01-01' AND '2013-12-31')
-AS fr ON fr.id = i.funding_round_id
-WHERE c.milestones > 6
+FROM(
+    SELECT v.user_id, COUNT(vt.id) AS cnt
+    FROM stackoverflow.votes v
+    JOIN stackoverflow.vote_types vt ON vt.id = v.vote_type_id
+    WHERE vt.name = 'Close'
+    GROUP BY v.user_id
+    ORDER BY cnt DESC
+    LIMIT 10) AS t
+ORDER BY t.cnt DESC, t.user_id DESC
 ---
 
-WITH acquiring AS
-(SELECT c.name AS buyer, a.price_amount AS price, a.id AS KEY
-FROM acquisition AS a
-LEFT JOIN company AS c ON a.acquiring_company_id = c.id
-WHERE a.price_amount > 0),
-acquired AS
-(SELECT c.name AS acquisition, c.funding_total AS investment, a.id AS KEY
-FROM acquisition AS a
-LEFT JOIN company AS c ON a.acquired_company_id = c.id
-WHERE c.funding_total > 0)
-SELECT acqn.buyer, acqn.price, acqd.acquisition, acqd.investment, ROUND(acqn.price / acqd.investment) AS uplift
-FROM acquiring AS acqn
-JOIN acquired AS acqd ON acqn.KEY = acqd.KEY
-ORDER BY price DESC, acquisition
-LIMIT 10
+SELECT *, DENSE_RANK() OVER (ORDER BY t.cnt DESC) AS n
+FROM (
+    SELECT COUNT(id) AS cnt, user_id
+    FROM stackoverflow.badges
+    WHERE creation_date::date BETWEEN '2008-11-15' AND '2008-12-15'
+    GROUP BY 2
+    ORDER BY cnt DESC, user_id
+    LIMIT 10) AS t
 ---
 
-SELECT  c.name AS social_co, EXTRACT (MONTH FROM fr.funded_at) AS funding_month
-FROM company AS c
-LEFT JOIN funding_round AS fr ON c.id = fr.company_id
-WHERE c.category_code = 'social'
-AND fr.funded_at BETWEEN '2010-01-01' AND '2013-12-31'
-AND fr.raised_amount <> 0
+WITH t AS
+(SELECT ROUND(AVG(score)) AS avg_score, user_id
+FROM stackoverflow.posts
+WHERE title IS NOT NULL AND score <> 0
+GROUP BY user_id)
+
+SELECT p.title, t.user_id, p.score, t.avg_score
+FROM t
+JOIN stackoverflow.posts p ON t.user_id = p.user_id
+WHERE p.title IS NOT NULL AND p.score <> 0
 ---
 
-WITH fundings AS
-(SELECT EXTRACT(MONTH FROM CAST(fr.funded_at AS DATE)) AS funding_month, COUNT(DISTINCT f.id) AS us_funds
-FROM fund AS f
-LEFT JOIN investment AS i ON f.id = i.fund_id
-LEFT JOIN funding_round AS fr ON i.funding_round_id = fr.id
-WHERE f.country_code = 'USA'
-AND EXTRACT(YEAR FROM CAST(fr.funded_at AS DATE)) BETWEEN 2010 AND 2013
-GROUP BY funding_month),
-acquisitions AS
-(SELECT EXTRACT(MONTH FROM CAST(acquired_at AS DATE)) AS funding_month, COUNT(acquired_company_id) AS bought_co, SUM(price_amount) AS sum_total
-FROM acquisition
-WHERE EXTRACT(YEAR FROM CAST(acquired_at AS DATE)) BETWEEN 2010 AND 2013
-GROUP BY funding_month)
-SELECT fnd.funding_month, fnd.us_funds, acq.bought_co, acq.sum_total
-FROM fundings AS fnd
-LEFT JOIN acquisitions AS acq ON fnd.funding_month = acq.funding_month
+SELECT title
+FROM stackoverflow.posts
+WHERE user_id IN (
+                  SELECT user_id
+                  FROM stackoverflow.badges
+                  GROUP BY user_id
+                  HAVING COUNT(id) > 1000)
+      AND title IS NOT NULL
 ---
 
-WITH y_11 AS
-(SELECT country_code AS country, AVG(funding_total) AS y_2011
-FROM company
-WHERE EXTRACT(YEAR FROM founded_at::DATE) IN (2011, 2012, 2013)
-GROUP BY country, EXTRACT(YEAR FROM founded_at)
-HAVING EXTRACT(YEAR FROM founded_at) = '2011'),
-y_12 AS
-(SELECT country_code AS country, AVG(funding_total) AS y_2012
-FROM company
-WHERE EXTRACT(YEAR FROM founded_at::DATE) IN (2011, 2012, 2013)
-GROUP BY country, EXTRACT(YEAR FROM founded_at)
-HAVING EXTRACT(YEAR FROM founded_at) = '2012'),
-y_13 AS
-(SELECT country_code AS country, AVG(funding_total) AS y_2013
-FROM company
-WHERE EXTRACT(YEAR FROM founded_at::DATE) IN (2011, 2012, 2013)
-GROUP BY country, EXTRACT(YEAR FROM founded_at)
-HAVING EXTRACT(YEAR FROM founded_at) = '2013')
-SELECT y_11.country, y_2011, y_2012, y_2013
-FROM y_11
-JOIN y_12 ON y_11.country = y_12.country
-JOIN y_13 ON y_12.country = y_13.country
-ORDER BY y_2011 DESC
+SELECT id, views, CASE
+                      WHEN views >= 350 THEN 1
+                      WHEN views < 100 THEN 3
+                      ELSE 2
+                  END AS group
+FROM stackoverflow.users
+WHERE location LIKE '%United States%' AND views > 0
+---
+
+WITH tab AS
+(SELECT t.id, t.views, t.group, MAX(t.views) OVER (PARTITION BY t.group) AS max
+FROM (SELECT id, views, CASE
+                      WHEN views >= 350 THEN 1
+                      WHEN views < 100 THEN 3
+                      ELSE 2
+                  END AS group
+      FROM stackoverflow.users
+      WHERE location LIKE '%United States%' AND views > 0) AS t)
+  
+SELECT tab.id, tab.views, tab.group
+FROM tab
+WHERE tab.views = tab.max
+ORDER BY tab.views DESC, tab.id
+---
+
+SELECT *, SUM(t.cnt_id) OVER (ORDER BY t.days) AS nn
+FROM (
+    SELECT EXTRACT(DAY FROM creation_date::date) AS days, COUNT(id) AS cnt_id
+    FROM stackoverflow.users
+    WHERE creation_date::date BETWEEN '2008-11-01' AND '2008-11-30'
+    GROUP BY days) AS t
+---
+
+WITH p AS
+(SELECT DISTINCT user_id, MIN(creation_date) OVER (PARTITION BY user_id) AS min_dt
+FROM stackoverflow.posts)
+
+SELECT p.user_id, (p.min_dt - u.creation_date) AS diff
+FROM stackoverflow.users AS u
+JOIN p ON u.id = p.user_id
+---
+
+SELECT SUM(views_count), DATE_TRUNC('month', creation_date)::date AS mnth
+FROM stackoverflow.posts
+GROUP BY DATE_TRUNC('month', creation_date)::date
+ORDER BY SUM(views_count) DESC
+---
+
+SELECT u.display_name, COUNT(DISTINCT p.user_id)
+FROM stackoverflow.posts AS p
+JOIN stackoverflow.users AS u ON p.user_id = u.id
+JOIN stackoverflow.post_types AS pt ON pt.id = p.post_type_id
+WHERE p.creation_date::date BETWEEN u.creation_date::date AND (u.creation_date::date + INTERVAL '1 month')
+AND pt.type LIKE '%Answer%'
+GROUP BY u.display_name
+HAVING COUNT(p.id) > 100
+ORDER BY u.display_name
+---
+
+WITH t AS 
+(SELECT u.id
+FROM stackoverflow.posts AS p
+JOIN stackoverflow.users AS u ON p.user_id = u.id
+WHERE DATE_TRUNC('month', u.creation_date)::date = '2008-09-01'
+AND DATE_TRUNC('month', p.creation_date)::date = '2008-12-01'
+GROUP BY u.id
+HAVING COUNT(p.id) > 0)
+  
+SELECT COUNT(p.id), DATE_TRUNC('month', p.creation_date)::date      
+FROM stackoverflow.posts AS p
+WHERE p.user_id IN (SELECT * FROM t)
+AND DATE_TRUNC('year', p.creation_date)::date = '2008-01-01'
+GROUP BY DATE_TRUNC('month', p.creation_date)::date
+ORDER BY DATE_TRUNC('month', p.creation_date)::date DESC
+---
+
+SELECT user_id, creation_date, views_count, SUM(views_count) OVER (PARTITION BY user_id ORDER BY creation_date)						
+FROM stackoverflow.posts
+---
+
+SELECT ROUND(AVG(t.cnt))
+FROM (
+      SELECT user_id, COUNT(DISTINCT creation_date::date) AS cnt
+      FROM stackoverflow.posts
+      WHERE creation_date::date BETWEEN '2008-12-01' AND '2008-12-07' 
+      GROUP BY user_id
+) AS t
+---
+
+WITH t AS 
+(SELECT EXTRACT(MONTH from creation_date::date) AS month, COUNT(DISTINCT id)    
+FROM stackoverflow.posts
+WHERE creation_date::date BETWEEN '2008-09-01' AND '2008-12-31'
+GROUP BY month
+)
+
+SELECT *, ROUND(((count::numeric / LAG(count) OVER (ORDER BY month)) - 1) * 100,2) AS user_growth
+FROM t
+---
+
+WITH t AS
+(SELECT user_id, COUNT(DISTINCT id) AS cnt
+FROM stackoverflow.posts
+GROUP BY user_id
+ORDER BY cnt DESC
+LIMIT 1),
+
+     t1 AS
+(SELECT p.user_id, p.creation_date, EXTRACT('week' from p.creation_date) AS week_number
+FROM stackoverflow.posts AS p
+JOIN t ON t.user_id = p.user_id
+WHERE DATE_TRUNC('month', p.creation_date)::date = '2008-10-01')
+
+SELECT DISTINCT week_number::numeric, MAX(creation_date) OVER (PARTITION BY week_number)
+FROM t1
+ORDER BY week_number
